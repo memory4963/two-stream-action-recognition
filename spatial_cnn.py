@@ -23,8 +23,8 @@ from network import *
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
 parser = argparse.ArgumentParser(description='UCF101 spatial stream on resnet101')
-parser.add_argument('--epochs', default=500, type=int, metavar='N', help='number of total epochs')
-parser.add_argument('--batch-size', default=25, type=int, metavar='N', help='mini-batch size (default: 25)')
+parser.add_argument('--epochs', default=1, type=int, metavar='N', help='number of total epochs')
+parser.add_argument('--batch-size', default=1, type=int, metavar='N', help='mini-batch size (default: 25)')
 parser.add_argument('--lr', default=5e-4, type=float, metavar='LR', help='initial learning rate')
 parser.add_argument('--evaluate', dest='evaluate', action='store_true', help='evaluate model on validation set')
 parser.add_argument('--resume', default='', type=str, metavar='PATH', help='path to latest checkpoint (default: none)')
@@ -39,8 +39,8 @@ def main():
     data_loader = dataloader.spatial_dataloader(
                         BATCH_SIZE=arg.batch_size,
                         num_workers=8,
-                        path='/home/luoao/action/data/ucf101/jpegs_256/',
-                        ucf_list ='/home/luoao/action/formers/two-stream-action-recognition/UCF_list/',
+                        path='/home/luoao/action/data/ucf101/try/',
+                        ucf_list ='/home/luoao/action/formers/two-stream-action-recognition/UCF_list2/',
                         ucf_split ='01', 
                         )
     
@@ -189,40 +189,95 @@ class Spatial_CNN():
         top5 = AverageMeter()
         # switch to evaluate mode
         self.model.eval()
-        self.dic_video_level_preds={}
+        self.dic_video_level_preds = {}
         end = time.time()
         progress = tqdm(self.test_loader)
-        for i, (keys,data,label) in enumerate(progress):
-            
-            label = label.cuda(async=True)
-            data_var = Variable(data, volatile=True).cuda(async=True)
-            label_var = Variable(label, volatile=True).cuda(async=True)
 
-            # compute output
-            output = self.model(data_var)
-            # measure elapsed time
-            batch_time.update(time.time() - end)
-            end = time.time()
-            #Calculate video level prediction
-            preds = output.data.cpu().numpy()
-            nb_data = preds.shape[0]
-            for j in range(nb_data):
-                videoName = keys[j].split('/',1)[0]
-                if videoName not in self.dic_video_level_preds.keys():
-                    self.dic_video_level_preds[videoName] = preds[j,:]
-                else:
-                    self.dic_video_level_preds[videoName] += preds[j,:]
+        keys = 'HandstandWalking_g01_c01'
+        index = 1
+        label = 37
+        path = '/home/luoao/action/data/ucf101/try/v_' + keys + '/'
+        img = Image.open(path + 'frame' + str(index).zfill(6) + '.jpg')
+        data = transforms.Compose([
+            transforms.Scale([224, 224]),
+            transforms.ToTensor(),
+            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+        ])(img)
+        img.close()
+
+        sample = (keys, data, label)
+
+        label = label.cuda(async=True)
+        data_var = Variable(data, volatile=True).cuda(async=True)
+        label_var = Variable(label, volatile=True).cuda(async=True)
+
+        # compute output
+        output = self.model(data_var)
+        # measure elapsed time
+        batch_time.update(time.time() - end)
+        end = time.time()
+        # Calculate video level prediction
+        preds = output.data.cpu().numpy()
+        nb_data = preds.shape[0]
+        for j in range(nb_data):
+            videoName = keys[j].split('/', 1)[0]
+            if videoName not in self.dic_video_level_preds.keys():
+                self.dic_video_level_preds[videoName] = preds[j, :]
+            else:
+                self.dic_video_level_preds[videoName] += preds[j, :]
 
         video_top1, video_top5, video_loss = self.frame2_video_level_accuracy()
-            
 
-        info = {'Epoch':[self.epoch],
-                'Batch Time':[round(batch_time.avg,3)],
-                'Loss':[round(video_loss,5)],
-                'Prec@1':[round(video_top1,3)],
-                'Prec@5':[round(video_top5,3)]}
-        record_info(info, 'record/spatial/rgb_test.csv','test')
+        info = {'Epoch': [self.epoch],
+                'Batch Time': [round(batch_time.avg, 3)],
+                'Loss': [round(video_loss, 5)],
+                'Prec@1': [round(video_top1, 3)],
+                'Prec@5': [round(video_top5, 3)]}
+        record_info(info, 'record/spatial/rgb_test.csv', 'test')
         return video_top1, video_loss
+
+    # def validate_1epoch(self):
+    #     print('==> Epoch:[{0}/{1}][validation stage]'.format(self.epoch, self.nb_epochs))
+    #     batch_time = AverageMeter()
+    #     losses = AverageMeter()
+    #     top1 = AverageMeter()
+    #     top5 = AverageMeter()
+    #     # switch to evaluate mode
+    #     self.model.eval()
+    #     self.dic_video_level_preds={}
+    #     end = time.time()
+    #     # progress = tqdm(self.test_loader)
+    #     for i, (keys,data,label) in enumerate(self.test_loader):
+    #
+    #         label = label.cuda(async=True)
+    #         data_var = Variable(data, volatile=True).cuda(async=True)
+    #         label_var = Variable(label, volatile=True).cuda(async=True)
+    #
+    #         # compute output
+    #         output = self.model(data_var)
+    #         # measure elapsed time
+    #         batch_time.update(time.time() - end)
+    #         end = time.time()
+    #         #Calculate video level prediction
+    #         preds = output.data.cpu().numpy()
+    #         nb_data = preds.shape[0]
+    #         for j in range(nb_data):
+    #             videoName = keys[j].split('/',1)[0]
+    #             if videoName not in self.dic_video_level_preds.keys():
+    #                 self.dic_video_level_preds[videoName] = preds[j,:]
+    #             else:
+    #                 self.dic_video_level_preds[videoName] += preds[j,:]
+    #
+    #     video_top1, video_top5, video_loss = self.frame2_video_level_accuracy()
+    #
+    #
+    #     info = {'Epoch':[self.epoch],
+    #             'Batch Time':[round(batch_time.avg,3)],
+    #             'Loss':[round(video_loss,5)],
+    #             'Prec@1':[round(video_top1,3)],
+    #             'Prec@5':[round(video_top5,3)]}
+    #     record_info(info, 'record/spatial/rgb_test.csv','test')
+    #     return video_top1, video_loss
 
     def frame2_video_level_accuracy(self):
             
