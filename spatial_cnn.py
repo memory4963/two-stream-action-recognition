@@ -39,8 +39,8 @@ def main():
     data_loader = dataloader.spatial_dataloader(
                         BATCH_SIZE=arg.batch_size,
                         num_workers=8,
-                        path='/home/ubuntu/data/UCF101/spatial_no_sampled/',
-                        ucf_list ='/home/ubuntu/cvlab/pytorch/ucf101_two_stream/github/UCF_list/',
+                        path='/home/luoao/action/data/ucf101/jpegs_256/',
+                        ucf_list ='/home/luoao/action/formers/two-stream-action-recognition/UCF_list/',
                         ucf_split ='01', 
                         )
     
