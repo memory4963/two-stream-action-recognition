@@ -53,11 +53,11 @@ We use a spatial and motion stream cnn with ResNet101 for modeling video informa
   * The reason we choose the number 19 is that the minimun number of video frames in UCF101 is 28 and we have to make sure there are sufficient frames for testing in 10 stack motion stream.
 ## 5. Performace
    
- network      | top1  |
---------------|:-----:|
-Spatial cnn   | 82.1% | 
-Motion cnn    | 79.4% | 
-Average fusion| 88.5% |      
+ network      | top1  | top5  |
+--------------|:-----:|:-----:|
+Spatial cnn   | 82.1% | 95.9% |
+Motion cnn    | 79.4% | 95.4% |
+Average fusion| 88.5% |     
    
 ## 6. Pre-trained Model
 
