@@ -108,20 +108,6 @@ class Motion_CNN():
         self.optimizer = torch.optim.SGD(self.model.parameters(), self.lr, momentum=0.9)
         self.scheduler = ReduceLROnPlateau(self.optimizer, 'min', patience=1, verbose=True)
 
-    def resume_model(self):
-        if self.resume:
-            if os.path.isfile(self.resume):
-                print("==> loading checkpoint '{}'".format(self.resume))
-                checkpoint = torch.load(self.resume)
-                self.start_epoch = checkpoint['epoch']
-                self.best_prec1 = checkpoint['best_prec1']
-                self.model.load_state_dict(checkpoint['state_dict'])
-                self.optimizer.load_state_dict(checkpoint['optimizer'])
-                print("==> loaded checkpoint '{}' (epoch {}) (best_prec1 {})"
-                      .format(self.resume, checkpoint['epoch'], self.best_prec1))
-            else:
-                print("==> no checkpoint found at '{}'".format(self.resume))
-
     def resume_and_evaluate(self):
         if self.resume:
             if os.path.isfile(self.resume):
@@ -291,37 +277,6 @@ class Motion_CNN():
         top1 = float(top1.numpy())
         top5 = float(top5.numpy())
 
-        return top1, top5, float(loss.data.cpu().numpy())
-
-    def frame_to_video_level_accuracy(self, dic_video_level_preds):
-
-        correct = 0
-        video_level_preds = np.zeros((len(dic_video_level_preds), 101))
-        video_level_labels = np.zeros(len(dic_video_level_preds))
-        ii = 0
-        for name in sorted(self.dic_video_level_preds.keys()):
-
-            preds = dic_video_level_preds[name]
-            label = int(self.test_video[name]) - 1
-
-            video_level_preds[ii, :] = preds
-            video_level_labels[ii] = label
-            ii += 1
-            if np.argmax(preds) == (label):
-                correct += 1
-
-        # top1 top5
-        video_level_labels = torch.from_numpy(video_level_labels).long()
-        video_level_preds = torch.from_numpy(video_level_preds).float()
-
-        top1, top5 = accuracy(video_level_preds, video_level_labels, topk=(1, 5))
-        loss = self.criterion(Variable(video_level_preds).cuda(),
-                              Variable(video_level_labels).cuda())
-
-        top1 = float(top1.numpy())
-        top5 = float(top5.numpy())
-
-        # print(' * Video level Prec@1 {top1:.3f}, Video level Prec@5 {top5:.3f}'.format(top1=top1, top5=top5))
         return top1, top5, float(loss.data.cpu().numpy())
 
 

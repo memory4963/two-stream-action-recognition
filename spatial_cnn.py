@@ -22,7 +22,7 @@ from network import *
 
 parser = argparse.ArgumentParser(description='UCF101 spatial stream on resnet101')
 parser.add_argument('--epochs', default=500, type=int, metavar='N', help='number of total epochs')
-parser.add_argument('--batch-size', default=32, type=int, metavar='N',
+parser.add_argument('--batch-size', default=8, type=int, metavar='N',
                     help='mini-batch size (default: 25)')
 parser.add_argument('--lr', default=5e-4, type=float, metavar='LR', help='initial learning rate')
 parser.add_argument('--evaluate', dest='evaluate', action='store_true',
@@ -56,7 +56,7 @@ def main():
             BATCH_SIZE=arg.batch_size,
             num_workers=8,
             path='E:\\dataset\\ucf101\\jpegs_256\\',
-            ucf_list='D:\\Graduate\\ActionRecognition\\formers\\two-stream-action-recognition\\UCF_list\\',
+            ucf_list='E:\\Graduate\\formers\\two-stream-action-recognition\\UCF_list\\',
             ucf_split='01',
         )
 
@@ -100,6 +100,20 @@ class Spatial_CNN():
         self.optimizer = torch.optim.SGD(self.model.parameters(), self.lr, momentum=0.9)
         self.scheduler = ReduceLROnPlateau(self.optimizer, 'min', patience=1, verbose=True)
 
+    def resume_model(self):
+        if self.resume:
+            if os.path.isfile(self.resume):
+                print("==> loading checkpoint '{}'".format(self.resume))
+                checkpoint = torch.load(self.resume)
+                self.start_epoch = checkpoint['epoch']
+                self.best_prec1 = checkpoint['best_prec1']
+                self.model.load_state_dict(checkpoint['state_dict'])
+                self.optimizer.load_state_dict(checkpoint['optimizer'])
+                print("==> loaded checkpoint '{}' (epoch {}) (best_prec1 {})"
+                      .format(self.resume, checkpoint['epoch'], self.best_prec1))
+            else:
+                print("==> no checkpoint found at '{}'".format(self.resume))
+
     def resume_and_evaluate(self):
         if self.resume:
             if os.path.isfile(self.resume):
@@ -118,11 +132,15 @@ class Spatial_CNN():
             prec1, val_loss = self.validate_1epoch()
             return
 
+    def evaluate(self):
+        self.build_model()
+        self.resume_and_evaluate()
+
     def run(self):
         self.build_model()
         self.resume_and_evaluate()
-        cudnn.benchmark = True
-
+        # cudnn.benchmark = True
+        #
         # for self.epoch in range(self.start_epoch, self.nb_epochs):
         #     self.train_1epoch()
         #     prec1, val_loss = self.validate_1epoch()
@@ -156,7 +174,6 @@ class Spatial_CNN():
         # mini-batch training
         progress = tqdm(self.train_loader)
         for i, (data_dict, label) in enumerate(progress):
-
             # measure data loading time
             data_time.update(time.time() - end)
 
@@ -264,12 +281,13 @@ class Spatial_CNN():
         top5 = AverageMeter()
         # switch to evaluate mode
         self.model.eval()
-        self.dic_video_level_preds={}
+        self.dic_video_level_preds = {}
         end = time.time()
         progress = tqdm(self.test_loader)
 
-        for i, (keys,data,label) in enumerate(progress):
-
+        for i, (keys, data, label) in enumerate(progress):
+            if i > 100:
+                break
             label = label.cuda(async=True)
             data_var = Variable(data, volatile=True).cuda(async=True)
             label_var = Variable(label, volatile=True).cuda(async=True)
@@ -279,26 +297,25 @@ class Spatial_CNN():
             # measure elapsed time
             batch_time.update(time.time() - end)
             end = time.time()
-            #Calculate video level prediction
+            # Calculate video level prediction
             preds = output.data.cpu().numpy()
             del output
             nb_data = preds.shape[0]
             for j in range(nb_data):
-                videoName = keys[j].split('/',1)[0]
+                videoName = keys[j].split('/', 1)[0]
                 if videoName not in self.dic_video_level_preds.keys():
-                    self.dic_video_level_preds[videoName] = preds[j,:]
+                    self.dic_video_level_preds[videoName] = preds[j, :]
                 else:
-                    self.dic_video_level_preds[videoName] += preds[j,:]
-
+                    self.dic_video_level_preds[videoName] += preds[j, :]
+        print(self.dic_video_level_preds)
         video_top1, video_top5, video_loss = self.frame2_video_level_accuracy()
 
-
-        info = {'Epoch':[self.epoch],
-                'Batch Time':[round(batch_time.avg,3)],
-                'Loss':[round(video_loss,5)],
-                'Prec@1':[round(video_top1,3)],
-                'Prec@5':[round(video_top5,3)]}
-        record_info(info, 'record/spatial/rgb_test.csv','test')
+        info = {'Epoch': [self.epoch],
+                'Batch Time': [round(batch_time.avg, 3)],
+                'Loss': [round(video_loss, 5)],
+                'Prec@1': [round(video_top1, 3)],
+                'Prec@5': [round(video_top5, 3)]}
+        record_info(info, 'record/spatial/rgb_test.csv', 'test')
         return video_top1, video_loss
 
     def frame2_video_level_accuracy(self):
@@ -310,6 +327,36 @@ class Spatial_CNN():
         for name in sorted(self.dic_video_level_preds.keys()):
 
             preds = self.dic_video_level_preds[name]
+            label = int(self.test_video[name]) - 1
+
+            video_level_preds[ii, :] = preds
+            video_level_labels[ii] = label
+            ii += 1
+            if np.argmax(preds) == (label):
+                correct += 1
+
+        # top1 top5
+        video_level_labels = torch.from_numpy(video_level_labels).long()
+        video_level_preds = torch.from_numpy(video_level_preds).float()
+
+        top1, top5 = accuracy(video_level_preds, video_level_labels, topk=(1, 5))
+        loss = self.criterion(Variable(video_level_preds).cuda(),
+                              Variable(video_level_labels).cuda())
+
+        top1 = float(top1.numpy())
+        top5 = float(top5.numpy())
+
+        # print(' * Video level Prec@1 {top1:.3f}, Video level Prec@5 {top5:.3f}'.format(top1=top1, top5=top5))
+        return top1, top5, float(loss.data.cpu().numpy())
+
+    def frame_to_video_level_accuracy(self, dic_video_level_preds):
+
+        correct = 0
+        video_level_preds = np.zeros((len(dic_video_level_preds), 101))
+        video_level_labels = np.zeros(len(dic_video_level_preds))
+        ii = 0
+        for name in sorted(dic_video_level_preds.keys()):
+            preds = dic_video_level_preds[name]
             label = int(self.test_video[name]) - 1
 
             video_level_preds[ii, :] = preds
