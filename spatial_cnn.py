@@ -1,15 +1,15 @@
 import numpy as np
 import pickle
 import os
-from PIL import Image
+# from PIL import Image
 import time
 from tqdm import tqdm
 import shutil
 from random import randint
 import argparse
 
-import torchvision.transforms as transforms
-import torchvision.models as models
+# import torchvision.transforms as transforms
+# import torchvision.models as models
 import torch.nn as nn
 import torch
 import torch.backends.cudnn as cudnn
@@ -31,14 +31,13 @@ parser.add_argument('--resume', default='', type=str, metavar='PATH',
                     help='path to latest checkpoint (default: none)')
 parser.add_argument('--start-epoch', default=0, type=int, metavar='N',
                     help='manual epoch number (useful on restarts)')
-parser.add_argument('--linux', default=False, type=bool, metavar='N', help='set OS')
+parser.add_argument('--linux', default=True, type=bool, metavar='N', help='set OS')
 parser.add_argument('--use-gpus', default='0', type=str, metavar='GPU', help='set GPUs used')
 
 
 def main():
     global arg
     arg = parser.parse_args()
-    print(arg)
 
     os.environ["CUDA_VISIBLE_DEVICES"] = arg.use_gpus
 
@@ -47,9 +46,8 @@ def main():
         data_loader = dataloader.spatial_dataloader(
             BATCH_SIZE=arg.batch_size,
             num_workers=8,
-            path='/home/luoao/action/data/ucf101/jpegs_256/',
-            ucf_list='/home/luoao/action/formers/two-stream-action-recognition/UCF_list/',
-            ucf_split='01',
+            path='/home/luoao/dataset/jpeg_256/',
+            ucf_list='/home/luoao/dataset/class_list/',
         )
     else:
         data_loader = dataloader.spatial_dataloader(
@@ -57,7 +55,6 @@ def main():
             num_workers=8,
             path='E:\\dataset\\ucf101\\jpegs_256\\',
             ucf_list='E:\\Graduate\\formers\\two-stream-action-recognition\\UCF_list\\',
-            ucf_split='01',
         )
 
     train_loader, test_loader, test_video = data_loader.run()
@@ -114,13 +111,19 @@ class Spatial_CNN():
             else:
                 print("==> no checkpoint found at '{}'".format(self.resume))
 
-    def resume_and_evaluate(self):
+    def resume_and_evaluate(self, modi_clz_num=False):
         if self.resume:
             if os.path.isfile(self.resume):
                 print("==> loading checkpoint '{}'".format(self.resume))
                 checkpoint = torch.load(self.resume)
                 self.start_epoch = checkpoint['epoch']
                 self.best_prec1 = checkpoint['best_prec1']
+                if modi_clz_num:
+                    checkpoint['state_dict'].pop(['fc_custom.weight'])
+                    checkpoint['state_dict'].pop(['fc_custom.bias'])
+                    self.best_prec1 = 0.0
+                    self.start_epoch = 0
+
                 self.model.load_state_dict(checkpoint['state_dict'])
                 self.optimizer.load_state_dict(checkpoint['optimizer'])
                 print("==> loaded checkpoint '{}' (epoch {}) (best_prec1 {})"
@@ -138,28 +141,28 @@ class Spatial_CNN():
 
     def run(self):
         self.build_model()
-        self.resume_and_evaluate()
-        # cudnn.benchmark = True
-        #
-        # for self.epoch in range(self.start_epoch, self.nb_epochs):
-        #     self.train_1epoch()
-        #     prec1, val_loss = self.validate_1epoch()
-        #     is_best = prec1 > self.best_prec1
-        #     # lr_scheduler
-        #     self.scheduler.step(val_loss)
-        #     # save model
-        #     if is_best:
-        #         self.best_prec1 = prec1
-        #         with open('record/spatial/spatial_video_preds.pickle', 'wb') as f:
-        #             pickle.dump(self.dic_video_level_preds, f)
-        #         f.close()
-        #
-        #     save_checkpoint({
-        #         'epoch': self.epoch,
-        #         'state_dict': self.model.state_dict(),
-        #         'best_prec1': self.best_prec1,
-        #         'optimizer': self.optimizer.state_dict()
-        #     }, is_best, 'record/spatial/checkpoint.pth.tar', 'record/spatial/model_best.pth.tar')
+        self.resume_and_evaluate(True)
+        cudnn.benchmark = True
+
+        for self.epoch in range(self.start_epoch, self.nb_epochs):
+            self.train_1epoch()
+            prec1, val_loss = self.validate_1epoch()
+            is_best = prec1 > self.best_prec1
+            # lr_scheduler
+            self.scheduler.step(val_loss)
+            # save model
+            if is_best:
+                self.best_prec1 = prec1
+                with open('record/spatial/spatial_video_preds.pickle', 'wb') as f:
+                    pickle.dump(self.dic_video_level_preds, f)
+                f.close()
+
+            save_checkpoint({
+                'epoch': self.epoch,
+                'state_dict': self.model.state_dict(),
+                'best_prec1': self.best_prec1,
+                'optimizer': self.optimizer.state_dict()
+            }, is_best, 'record/spatial/checkpoint.pth.tar', 'record/spatial/model_best.pth.tar')
 
     def train_1epoch(self):
         print('==> Epoch:[{0}/{1}][training stage]'.format(self.epoch, self.nb_epochs))
@@ -286,8 +289,6 @@ class Spatial_CNN():
         progress = tqdm(self.test_loader)
 
         for i, (keys, data, label) in enumerate(progress):
-            if i > 100:
-                break
             label = label.cuda(async=True)
             data_var = Variable(data, volatile=True).cuda(async=True)
             label_var = Variable(label, volatile=True).cuda(async=True)
@@ -307,7 +308,6 @@ class Spatial_CNN():
                     self.dic_video_level_preds[videoName] = preds[j, :]
                 else:
                     self.dic_video_level_preds[videoName] += preds[j, :]
-        print(self.dic_video_level_preds)
         video_top1, video_top5, video_loss = self.frame2_video_level_accuracy()
 
         info = {'Epoch': [self.epoch],
