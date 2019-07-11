@@ -23,9 +23,9 @@ class spatial_dataset(Dataset):
         if video_name.split('_')[0] == 'HandstandPushups':
             n, g = video_name.split('_', 1)
             name = 'HandStandPushups_' + g
-            path = self.root_dir + 'v_' + name + '\\'
+            path = self.root_dir + name + '/'
         else:
-            path = self.root_dir + 'v_' + video_name + '\\'
+            path = self.root_dir + video_name + '/'
         # print(path + 'frame' + str(index).zfill(6) + '.jpg')
 
         img = Image.open(open(path + 'frame' + str(index).zfill(6) + '.jpg', 'rb'))
@@ -89,7 +89,7 @@ class spatial_dataloader():
             contents = [x.strip('\n') for x in contents]
             for content in contents:
                 strs = content.split(' ')
-                self.frame_count[strs[0]] = strs[1]
+                self.frame_count[strs[0].split('.', 1)[0]] = int(strs[1])
         file.close()
 
     def run(self):
@@ -124,7 +124,7 @@ class spatial_dataloader():
     def train(self):
         training_set = spatial_dataset(dic=self.dic_training, root_dir=self.data_path, mode='train',
                                        transform=transforms.Compose([
-                                           transforms.RandomCrop(224),
+                                           transforms.RandomCrop(100),
                                            transforms.RandomHorizontalFlip(),
                                            transforms.ToTensor(),
                                            transforms.Normalize(mean=[0.485, 0.456, 0.406],

@@ -119,8 +119,8 @@ class Spatial_CNN():
                 self.start_epoch = checkpoint['epoch']
                 self.best_prec1 = checkpoint['best_prec1']
                 if modi_clz_num:
-                    checkpoint['state_dict'].pop(['fc_custom.weight'])
-                    checkpoint['state_dict'].pop(['fc_custom.bias'])
+                    checkpoint['state_dict'].pop('fc_custom.weight')
+                    checkpoint['state_dict'].pop('fc_custom.bias')
                     self.best_prec1 = 0.0
                     self.start_epoch = 0
 
