@@ -23,7 +23,7 @@ class UCF101_splitter():
             for filename in files:
                 if filename.split('.')[0] == 'train_list':
                     train_video = self.file2_dic(self.path + filename)
-                if filename.split('.')[0] == 'validate_list':
+                if filename.split('.')[0] == 'test_list':
                     test_video = self.file2_dic(self.path + filename)
         print('==> (Training video, Validation video):(', len(train_video), len(test_video), ')')
         self.train_video = self.name_HandstandPushups(train_video)

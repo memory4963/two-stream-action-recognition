@@ -116,17 +116,20 @@ class Spatial_CNN():
             if os.path.isfile(self.resume):
                 print("==> loading checkpoint '{}'".format(self.resume))
                 checkpoint = torch.load(self.resume)
-                self.start_epoch = checkpoint['epoch']
-                self.best_prec1 = checkpoint['best_prec1']
+
                 if modi_clz_num:
                     state_dict = self.model.state_dict()
                     checkpoint['state_dict']['fc_custom.weight'] = state_dict['fc_custom.weight']
                     checkpoint['state_dict']['fc_custom.bias'] = state_dict['fc_custom.bias']
                     self.best_prec1 = 0.0
                     self.start_epoch = 0
+                else:
+                    self.optimizer.load_state_dict(checkpoint['optimizer'])
+                    self.start_epoch = checkpoint['epoch']
+                    self.best_prec1 = checkpoint['best_prec1']
 
                 self.model.load_state_dict(checkpoint['state_dict'])
-                self.optimizer.load_state_dict(checkpoint['optimizer'])
+
                 print("==> loaded checkpoint '{}' (epoch {}) (best_prec1 {})"
                       .format(self.resume, checkpoint['epoch'], self.best_prec1))
             else:
@@ -142,28 +145,29 @@ class Spatial_CNN():
 
     def run(self):
         self.build_model()
-        self.resume_and_evaluate(True)
+        self.resume_and_evaluate()
         cudnn.benchmark = True
 
         for self.epoch in range(self.start_epoch, self.nb_epochs):
             self.train_1epoch()
-            prec1, val_loss = self.validate_1epoch()
-            is_best = prec1 > self.best_prec1
-            # lr_scheduler
-            self.scheduler.step(val_loss)
-            # save model
-            if is_best:
-                self.best_prec1 = prec1
-                with open('record/spatial/spatial_video_preds.pickle', 'wb') as f:
-                    pickle.dump(self.dic_video_level_preds, f)
-                f.close()
+            if self.epoch % 5 == 0:
+                prec1, val_loss = self.validate_1epoch()
+                is_best = prec1 > self.best_prec1
+                # lr_scheduler
+                self.scheduler.step(val_loss)
+                # save model
+                if is_best:
+                    self.best_prec1 = prec1
+                    with open('record/spatial/spatial_video_preds.pickle', 'wb') as f:
+                        pickle.dump(self.dic_video_level_preds, f)
+                    f.close()
 
-            save_checkpoint({
-                'epoch': self.epoch,
-                'state_dict': self.model.state_dict(),
-                'best_prec1': self.best_prec1,
-                'optimizer': self.optimizer.state_dict()
-            }, is_best, 'record/spatial/checkpoint.pth.tar', 'record/spatial/model_best.pth.tar')
+                save_checkpoint({
+                    'epoch': self.epoch,
+                    'state_dict': self.model.state_dict(),
+                    'best_prec1': self.best_prec1,
+                    'optimizer': self.optimizer.state_dict()
+                }, is_best, 'record/nocrop/spatial/checkpoint.pth.tar', 'record/nocrop/spatial/model_best.pth.tar')
 
     def train_1epoch(self):
         print('==> Epoch:[{0}/{1}][training stage]'.format(self.epoch, self.nb_epochs))
@@ -185,7 +189,7 @@ class Spatial_CNN():
             target_var = Variable(label).cuda()
 
             # compute output
-            output = Variable(torch.zeros(len(data_dict['img1']), 101).float()).cuda()
+            output = Variable(torch.zeros(len(data_dict['img1']), 10).float()).cuda()
             for i in range(len(data_dict)):
                 key = 'img' + str(i)
                 data = data_dict[key]
@@ -193,7 +197,6 @@ class Spatial_CNN():
                 output += self.model(input_var)
 
             loss = self.criterion(output, target_var)
-            print(loss.item(), type(loss))
 
             # measure accuracy and record loss
             prec1, prec5 = accuracy(output.data, label, topk=(1, 5))
@@ -322,7 +325,7 @@ class Spatial_CNN():
     def frame2_video_level_accuracy(self):
 
         correct = 0
-        video_level_preds = np.zeros((len(self.dic_video_level_preds), 101))
+        video_level_preds = np.zeros((len(self.dic_video_level_preds), 10))
         video_level_labels = np.zeros(len(self.dic_video_level_preds))
         ii = 0
         for name in sorted(self.dic_video_level_preds.keys()):
@@ -353,7 +356,7 @@ class Spatial_CNN():
     def frame_to_video_level_accuracy(self, dic_video_level_preds):
 
         correct = 0
-        video_level_preds = np.zeros((len(dic_video_level_preds), 101))
+        video_level_preds = np.zeros((len(dic_video_level_preds), 10))
         video_level_labels = np.zeros(len(dic_video_level_preds))
         ii = 0
         for name in sorted(dic_video_level_preds.keys()):

@@ -124,7 +124,7 @@ class spatial_dataloader():
     def train(self):
         training_set = spatial_dataset(dic=self.dic_training, root_dir=self.data_path, mode='train',
                                        transform=transforms.Compose([
-                                           transforms.RandomCrop(100, pad_if_needed=True),
+                                          # transforms.RandomCrop(100, pad_if_needed=True),
                                            transforms.Scale([224, 224]),
                                            transforms.RandomHorizontalFlip(),
                                            transforms.ToTensor(),
