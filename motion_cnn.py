@@ -31,14 +31,13 @@ parser.add_argument('--resume', default='', type=str, metavar='PATH',
                     help='path to latest checkpoint (default: none)')
 parser.add_argument('--start-epoch', default=0, type=int, metavar='N',
                     help='manual epoch number (useful on restarts)')
-parser.add_argument('--linux', default=False, type=bool, metavar='N', help='set OS')
+parser.add_argument('--linux', default=True, type=bool, metavar='N', help='set OS')
 parser.add_argument('--use-gpus', default='0', type=str, metavar='GPU', help='set GPUs used')
 
 
 def main():
     global arg
     arg = parser.parse_args()
-    print(arg)
 
     os.environ["CUDA_VISIBLE_DEVICES"] = arg.use_gpus
 
@@ -47,9 +46,8 @@ def main():
         data_loader = dataloader.Motion_DataLoader(
             BATCH_SIZE=arg.batch_size,
             num_workers=8,
-            path='/home/ubuntu/data/UCF101/tvl1_flow/',
-            ucf_list='/home/ubuntu/cvlab/pytorch/ucf101_two_stream/github/UCF_list/',
-            ucf_split='01',
+            path='/home/luoao/dataset/flow/',
+            ucf_list='/home/luoao/dataset/class_list/',
             in_channel=10,
         )
     else:
@@ -58,7 +56,6 @@ def main():
             num_workers=8,
             path='E:\\dataset\\ucf101\\tvl1_flow\\',
             ucf_list='D:\\Graduate\\ActionRecognition\\formers\\two-stream-action-recognition\\UCF_list\\',
-            ucf_split='01',
             in_channel=10,
         )
 
@@ -122,15 +119,24 @@ class Motion_CNN():
             else:
                 print("==> no checkpoint found at '{}'".format(self.resume))
 
-    def resume_and_evaluate(self):
+    def resume_and_evaluate(self, modi_clz_num=False):
         if self.resume:
             if os.path.isfile(self.resume):
                 print("==> loading checkpoint '{}'".format(self.resume))
                 checkpoint = torch.load(self.resume)
-                self.start_epoch = checkpoint['epoch']
-                self.best_prec1 = checkpoint['best_prec1']
+
+                if modi_clz_num:
+                    state_dict = self.model.state_dict()
+                    checkpoint['state_dict']['fc_custom.weight'] = state_dict['fc_custom.weight']
+                    checkpoint['state_dict']['fc_custom.bias'] = state_dict['fc_custom.bias']
+                    self.best_prec1 = 0.0
+                    self.start_epoch = 0
+                else:
+                    self.optimizer.load_state_dict(checkpoint['optimizer'])
+                    self.start_epoch = checkpoint['epoch']
+                    self.best_prec1 = checkpoint['best_prec1']
+
                 self.model.load_state_dict(checkpoint['state_dict'])
-                self.optimizer.load_state_dict(checkpoint['optimizer'])
                 print("==> loaded checkpoint '{}' (epoch {}) (best_prec1 {})"
                       .format(self.resume, checkpoint['epoch'], self.best_prec1))
             else:

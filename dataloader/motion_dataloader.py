@@ -85,7 +85,7 @@ class motion_dataset(Dataset):
 
 
 class Motion_DataLoader():
-    def __init__(self, BATCH_SIZE, num_workers, in_channel, path, ucf_list, ucf_split):
+    def __init__(self, BATCH_SIZE, num_workers, in_channel, path, ucf_list):
 
         self.BATCH_SIZE = BATCH_SIZE
         self.num_workers = num_workers
@@ -93,23 +93,18 @@ class Motion_DataLoader():
         self.in_channel = in_channel
         self.data_path = path
         # split the training and testing videos
-        splitter = UCF101_splitter(path=ucf_list, split=ucf_split)
+        splitter = UCF101_splitter(path=ucf_list)
         self.train_video, self.test_video = splitter.split_video()
 
     def load_frame_count(self):
         # print '==> Loading frame number of each video'
-        with open(
-                'E:\\Graduate\\formers\\two-stream-action-recognition\\dataloader\\dic\\frame_count.pickle2',
-                'rb') as file:
-            dic_frame = pickle.load(file)
+        with open(self.ucf_list + 'frame_count.txt') as file:
+            contents = file.readlines()
+            contents = [x.strip('\n') for x in contents]
+            for content in contents:
+                strs = content.split(' ')
+                self.frame_count[strs[0].split('.', 1)[0]] = int(strs[1])
         file.close()
-
-        for line in dic_frame:
-            videoname = line.split('_', 1)[1].split('.', 1)[0]
-            n, g = videoname.split('_', 1)
-            if n == 'HandStandPushups':
-                videoname = 'HandstandPushups_' + g
-            self.frame_count[videoname] = dic_frame[line]
 
     def run(self):
         self.load_frame_count()

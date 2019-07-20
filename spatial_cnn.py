@@ -139,9 +139,9 @@ class Spatial_CNN():
             prec1, val_loss = self.validate_1epoch()
             return
 
-    def evaluate(self):
-        self.build_model()
-        self.resume_and_evaluate()
+    # def evaluate(self):
+    #     self.build_model()
+    #     self.resume_and_evaluate()
 
     def run(self):
         self.build_model()
