@@ -31,7 +31,6 @@ class motion_dataset(Dataset):
         self.img_cols = 224
 
     def stackopf(self):
-        name = 'v_' + self.video
         u = self.root_dir + 'u/' + name
         v = self.root_dir + 'v/' + name
 
