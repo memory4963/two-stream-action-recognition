@@ -31,8 +31,8 @@ class motion_dataset(Dataset):
         self.img_cols = 224
 
     def stackopf(self):
-        u = self.root_dir + 'u/' + name
-        v = self.root_dir + 'v/' + name
+        u = self.root_dir + 'u/' + self.video
+        v = self.root_dir + 'v/' + self.video
 
         flow = torch.FloatTensor(2 * self.in_channel, self.img_rows, self.img_cols)
         i = int(self.clips_idx)
@@ -50,8 +50,8 @@ class motion_dataset(Dataset):
             H = self.transform(imgH)
             V = self.transform(imgV)
 
-            flow[2 * (j - 1), :, :] = H
-            flow[2 * (j - 1) + 1, :, :] = V
+            flow[2 * (j - 1), :, :] = H[0, :, :]
+            flow[2 * (j - 1) + 1, :, :] = V[0, :, :]
             imgH.close()
             imgV.close()
         return flow
@@ -63,10 +63,10 @@ class motion_dataset(Dataset):
         # print ('mode:',self.mode,'calling Dataset:__getitem__ @ idx=%d'%idx)
 
         if self.mode == 'train':
-            self.video, nb_clips = self.keys[idx].split('-')
+            self.video, nb_clips = self.keys[idx].split(' ')
             self.clips_idx = random.randint(1, int(nb_clips))
         elif self.mode == 'val':
-            self.video, self.clips_idx = self.keys[idx].split('-')
+            self.video, self.clips_idx = self.keys[idx].split(' ')
         else:
             raise ValueError('There are only train and val mode')
 
@@ -91,6 +91,7 @@ class Motion_DataLoader():
         self.frame_count = {}
         self.in_channel = in_channel
         self.data_path = path
+        self.ucf_list = ucf_list
         # split the training and testing videos
         splitter = UCF101_splitter(path=ucf_list)
         self.train_video, self.test_video = splitter.split_video()
@@ -123,14 +124,14 @@ class Motion_DataLoader():
             sampling_interval = int((self.frame_count[video] - 10 + 1) / 19)
             for index in range(19):
                 clip_idx = index * sampling_interval
-                key = video + '-' + str(clip_idx + 1)
+                key = video + ' ' + str(clip_idx + 1)
                 self.dic_test_idx[key] = self.test_video[video]
 
     def get_training_dic(self):
         self.dic_video_train = {}
         for video in self.train_video:
             nb_clips = self.frame_count[video] - 10 + 1
-            key = video + '-' + str(nb_clips)
+            key = video + ' ' + str(nb_clips)
             self.dic_video_train[key] = self.train_video[video]
 
     def train(self):

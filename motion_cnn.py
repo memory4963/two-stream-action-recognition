@@ -153,23 +153,24 @@ class Motion_CNN():
 
         for self.epoch in range(self.start_epoch, self.nb_epochs):
             self.train_1epoch()
-            prec1, val_loss = self.validate_1epoch()
-            is_best = prec1 > self.best_prec1
-            # lr_scheduler
-            self.scheduler.step(val_loss)
-            # save model
-            if is_best:
-                self.best_prec1 = prec1
-                with open('record/motion/motion_video_preds.pickle', 'wb') as f:
-                    pickle.dump(self.dic_video_level_preds, f)
-                f.close()
+            if self.epoch % 5 == 0:
+                prec1, val_loss = self.validate_1epoch()
+                is_best = prec1 > self.best_prec1
+                # lr_scheduler
+                self.scheduler.step(val_loss)
+                # save model
+                if is_best:
+                    self.best_prec1 = prec1
+                    with open('record/motion/motion_video_preds.pickle', 'wb') as f:
+                        pickle.dump(self.dic_video_level_preds, f)
+                    f.close()
 
-            save_checkpoint({
-                'epoch': self.epoch,
-                'state_dict': self.model.state_dict(),
-                'best_prec1': self.best_prec1,
-                'optimizer': self.optimizer.state_dict()
-            }, is_best, 'record/motion/checkpoint.pth.tar', 'record/motion/model_best.pth.tar')
+                save_checkpoint({
+                    'epoch': self.epoch,
+                    'state_dict': self.model.state_dict(),
+                    'best_prec1': self.best_prec1,
+                    'optimizer': self.optimizer.state_dict()
+                }, is_best, 'record/nocrop/motion/checkpoint.pth.tar', 'record/nocrop/motion/model_best.pth.tar')
 
     def train_1epoch(self):
         print('==> Epoch:[{0}/{1}][training stage]'.format(self.epoch, self.nb_epochs))
@@ -198,9 +199,9 @@ class Motion_CNN():
 
             # measure accuracy and record loss
             prec1, prec5 = accuracy(output.data, label, topk=(1, 5))
-            losses.update(loss.data[0], data.size(0))
-            top1.update(prec1[0], data.size(0))
-            top5.update(prec5[0], data.size(0))
+            losses.update(loss.data.item(), data.size(0))
+            top1.update(prec1.item(), data.size(0))
+            top5.update(prec5.item(), data.size(0))
 
             # compute gradient and do SGD step
             self.optimizer.zero_grad()
@@ -251,7 +252,7 @@ class Motion_CNN():
             del output
             nb_data = preds.shape[0]
             for j in range(nb_data):
-                videoName = keys[j].split('-', 1)[0]  # ApplyMakeup_g01_c01
+                videoName = keys[j].split(' ', 1)[0]  # ApplyMakeup_g01_c01
                 if videoName not in self.dic_video_level_preds.keys():
                     self.dic_video_level_preds[videoName] = preds[j, :]
                 else:
@@ -271,12 +272,13 @@ class Motion_CNN():
     def frame2_video_level_accuracy(self):
 
         correct = 0
-        video_level_preds = np.zeros((len(self.dic_video_level_preds), 101))
+        video_level_preds = np.zeros((len(self.dic_video_level_preds), 10))
         video_level_labels = np.zeros(len(self.dic_video_level_preds))
         ii = 0
         for key in sorted(self.dic_video_level_preds.keys()):
-            name = key.split('-', 1)[0]
-
+            name = key.split(' ', 1)[0]
+            print(name)
+            print(key)
             preds = self.dic_video_level_preds[name]
             label = int(self.test_video[name]) - 1
 
