@@ -115,7 +115,8 @@ class ResNet(nn.Module):
         self.layer3 = self._make_layer(block, 256, layers[2], stride=2)
         self.layer4 = self._make_layer(block, 512, layers[3], stride=2)
         self.avgpool = nn.AvgPool2d(7)
-        self.fc_custom = nn.Linear(512 * block.expansion, nb_classes)
+        self.fc_feature = nn.Linear(512*block.expansion, 400)
+        self.fc_custom = nn.Linear(400, nb_classes)
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
                 n = m.kernel_size[0] * m.kernel_size[1] * m.out_channels
@@ -154,6 +155,7 @@ class ResNet(nn.Module):
 
         x = self.avgpool(x)
         x = x.view(x.size(0), -1)
+        x = self.fc_feature(x)
         out = self.fc_custom(x)
         return out
 

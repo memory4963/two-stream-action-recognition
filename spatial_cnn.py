@@ -117,18 +117,18 @@ class Spatial_CNN():
                 print("==> loading checkpoint '{}'".format(self.resume))
                 checkpoint = torch.load(self.resume)
 
+                state_dict = self.model.state_dict()
+                weight_dict = {k: v for k, v in checkpoint['state_dict'].items() if k in state_dict}
+                state_dict.update(weight_dict)
+                self.model.load_state_dict(state_dict)
+
                 if modi_clz_num:
-                    state_dict = self.model.state_dict()
-                    checkpoint['state_dict']['fc_custom.weight'] = state_dict['fc_custom.weight']
-                    checkpoint['state_dict']['fc_custom.bias'] = state_dict['fc_custom.bias']
                     self.best_prec1 = 0.0
                     self.start_epoch = 0
                 else:
                     self.optimizer.load_state_dict(checkpoint['optimizer'])
                     self.start_epoch = checkpoint['epoch']
                     self.best_prec1 = checkpoint['best_prec1']
-
-                self.model.load_state_dict(checkpoint['state_dict'])
 
                 print("==> loaded checkpoint '{}' (epoch {}) (best_prec1 {})"
                       .format(self.resume, checkpoint['epoch'], self.best_prec1))
@@ -167,7 +167,8 @@ class Spatial_CNN():
                     'state_dict': self.model.state_dict(),
                     'best_prec1': self.best_prec1,
                     'optimizer': self.optimizer.state_dict()
-                }, is_best, 'record/nocrop/spatial/checkpoint.pth.tar', 'record/nocrop/spatial/model_best.pth.tar')
+                }, is_best, 'record/feature/spatial/checkpoint.pth.tar',
+                    'record/feature/spatial/model_best.pth.tar')
 
     def train_1epoch(self):
         print('==> Epoch:[{0}/{1}][training stage]'.format(self.epoch, self.nb_epochs))
